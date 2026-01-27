@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard | Saravana Kumar M</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    /* === Extra table styles === */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 2rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background: var(--primary-green, #e55300);
+      color: #fff;
+    }
+
+    tr:hover {
+      background-color: #fff5ee;
+    }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: var(--primary-green, #e55300);
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .delete-btn:hover {
+      color: #b43d00;
+    }
+
+    .mailto-icon {
+      color: var(--primary-green, #e55300);
+      margin-left: 6px;
+    }
+
+    .mailto-icon:hover {
+      color: #000;
+    }
+
+    .controls {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border: 2px solid var(--primary-green, #e55300);
+      background: transparent;
+      color: var(--primary-green, #e55300);
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: var(--primary-green, #e55300);
+      color: #fff;
+    }
+
+    .search-box {
+      margin-top: 1.5rem;
+      padding: 0.5rem 1rem;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  margin: 1rem;
+  font-weight: 500;
+  color: var(--primary-green, #e55300);
+  border: 2px solid var(--primary-green, #e55300);
+  border-radius: 6px;
+  text-decoration: none;
+  background: transparent;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.back-btn:hover {
+  background-color: var(--primary-green, #e55300);
+  color: white;
+}
+
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-btn">
+    <i class="fas fa-arrow-left"></i> Back
+  </a>
+  <div class="container">
+    
+    <h1 style="text-align: center; color: var(--primary-green);">📬 Contact Dashboard</h1>
+
+    <div class="controls">
+      <button class="btn" onclick="loadContacts()">🔄 Load</button>
+      <button class="btn" onclick="refreshData()" id="refreshBtn" disabled>🔃 Refresh</button>
+      <button class="btn" onclick="exportToCSV()" id="exportBtn" disabled>📁 Export CSV</button>
+    </div>
+
+    <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search name, email, or message" oninput="filterContacts()" />
+
+    <div class="table-container" id="tableContainer" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>👤 Name</th>
+            <th>📧 Email</th>
+            <th>💬 Message</th>
+            <th>📅 Submitted</th>
+            <th>⏰ Time</th>
+            <th>🗑️</th>
+          </tr>
+        </thead>
+        <tbody id="contactsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      deleteDoc,
+      doc,
+      orderBy,
+      query
+    } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA1cDs79vmLw4RPs12c6ow3mKkZOYUEsTg",
+      authDomain: "portfolio-webapp-1aac4.firebaseapp.com",
+      projectId: "portfolio-webapp-1aac4",
+      storageBucket: "portfolio-webapp-1aac4.appspot.com",
+      messagingSenderId: "78285808940",
+      appId: "1:78285808940:web:f012c69d9e2e602d8a7889"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    let contactsData = [];
+
+    function format12Hour(date) {
+      const hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      const hrs = hours % 12 || 12;
+      return `${hrs}:${minutes} ${ampm}`;
+    }
+
+    window.loadContacts = async function () {
+      const q = query(collection(db, "contacts"), orderBy("timestamp", "desc"));
+      const snapshot = await getDocs(q);
+      contactsData = [];
+      snapshot.forEach(doc => {
+        contactsData.push({ ...doc.data(), id: doc.id });
+      });
+
+      if (contactsData.length > 0) {
+        document.getElementById("tableContainer").style.display = "block";
+        document.getElementById("refreshBtn").disabled = false;
+        document.getElementById("exportBtn").disabled = false;
+        displayContacts(contactsData);
+      }
+    };
+
+    function displayContacts(data) {
+      const tbody = document.getElementById("contactsTableBody");
+      tbody.innerHTML = "";
+      data.forEach((c) => {
+        const date = c.timestamp?.toDate?.() || new Date(c.submitted);
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${c.name || "N/A"}</td>
+          <td>
+            ${c.email || "N/A"}
+            <a class="mailto-icon" href="mailto:${c.email}" title="Send Email"><i class="fas fa-envelope"></i></a>
+          </td>
+          <td>${c.message || "-"}</td>
+          <td>${new Date(c.submitted).toLocaleDateString()}</td>
+          <td>${format12Hour(date)}</td>
+          <td><button class="delete-btn" onclick="deleteContact('${c.id}', this)"><i class="fas fa-trash-alt"></i></button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    window.deleteContact = async function (id, btn) {
+      if (!confirm("Delete this message?")) return;
+      try {
+        await deleteDoc(doc(db, "contacts", id));
+        btn.closest("tr").remove();
+      } catch (err) {
+        alert("Error deleting message.");
+        console.error(err);
+      }
+    };
+
+    window.refreshData = () => loadContacts();
+
+    window.filterContacts = function () {
+      const term = document.getElementById("searchBox").value.toLowerCase();
+      const filtered = contactsData.filter(c =>
+        (c.name || "").toLowerCase().includes(term) ||
+        (c.email || "").toLowerCase().includes(term) ||
+        (c.message || "").toLowerCase().includes(term)
+      );
+      displayContacts(filtered);
+    };
+
+    window.exportToCSV = function () {
+      if (contactsData.length === 0) return alert("No data to export.");
+      let csv = "Name,Email,Message,Submitted,Time\n";
+      contactsData.forEach(c => {
+        const d = c.timestamp?.toDate?.() || new Date(c.submitted);
+        csv += `"${c.name}","${c.email}","${c.message}","${new Date(c.submitted).toLocaleDateString()}","${format12Hour(d)}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contact_messages.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+  </script>
+</body>
+</html>
